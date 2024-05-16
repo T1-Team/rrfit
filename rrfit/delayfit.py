@@ -16,7 +16,14 @@ def fit_cable_delay(s21_phase, f, exclude=None, plot=False):
     if exclude is None:
         result = model.fit(s21_phase, f)
         if plot:
-            result.plot(datafmt=".", show_init=True)
+            result.plot(
+                datafmt=".",
+                xlabel="Frequency (MHz)",
+                ylabel="arg(S21) (rad)",
+                data_kws={"ms": 2, "c": "k"},
+                fit_kws={"lw": 1.5, "c": "r"},
+                title=f"Fitted cable delay: {tau:.3e}s",
+            )
         return result.best_values["tau"]
 
     # fit left-most and right-most data points each to a linear model
@@ -37,8 +44,8 @@ def fit_cable_delay(s21_phase, f, exclude=None, plot=False):
 
     if plot:
         plt.scatter(f, s21_phase, s=2, c="k", label="data")
-        plt.plot(lf, lresult.best_fit, c="r", label="left fit")
-        plt.plot(rf, rresult.best_fit, c="r", label="right fit")
+        plt.plot(lf, lresult.best_fit, lw=1.5, c="r", label="left fit")
+        plt.plot(rf, rresult.best_fit, lw=1.5, c="r", label="right fit")
         plt.xlabel("Frequency (Hz)")
         plt.ylabel("arg(S21) (rad)")
         plt.title(f"Fitted cable delay: {tau:.3e}s")
