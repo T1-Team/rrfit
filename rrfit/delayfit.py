@@ -15,6 +15,7 @@ def fit_cable_delay(s21_phase, f, exclude=None, plot=False):
     # fit all data to a linear model
     if exclude is None:
         result = model.fit(s21_phase, f)
+        tau = result.best_values["tau"]
         if plot:
             result.plot(
                 datafmt=".",
@@ -24,7 +25,7 @@ def fit_cable_delay(s21_phase, f, exclude=None, plot=False):
                 fit_kws={"lw": 1.5, "c": "r"},
                 title=f"Fitted cable delay: {tau:.3e}s",
             )
-        return result.best_values["tau"]
+        return tau
 
     # fit left-most and right-most data points each to a linear model
     # return the mean tau from these two fits
