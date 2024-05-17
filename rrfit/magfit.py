@@ -20,3 +20,4 @@ def fit_magnitude(s21_mag, f, plot=False):
             fit_kws={"lw": 1.5, "c": "r"},
             title=f"Magnitude fit: {title[:-2]}",
         )
+    return result
