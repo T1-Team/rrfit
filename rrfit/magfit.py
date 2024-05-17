@@ -1,11 +1,12 @@
 """ """
 
+from lmfit.model import ModelResult
 import matplotlib.pyplot as plt
 
 from rrfit.models import S21LogMagModel
 
 
-def fit_magnitude(s21_mag, f, plot=False):
+def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
     """ """
     result = S21LogMagModel().fit(s21_mag, f)
     title = ""

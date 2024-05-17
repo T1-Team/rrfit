@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from rrfit.models import S21PhaseLinearModel
 
 
-def fit_cable_delay(s21_phase, f, exclude=None, plot=False):
+def fit_cable_delay(s21_phase, f, exclude=None, plot=False) -> float:
     """
     exclude tuple(int, int): select data to exclude from cable delay fit
     """
