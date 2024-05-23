@@ -3,7 +3,12 @@
 from lmfit import Model
 import numpy as np
 
-from rrfit.fitfns import asymmetric_lorentzian, cable_delay_linear
+from rrfit.fitfns import (
+    asymmetric_lorentzian,
+    cable_delay_linear,
+    centered_phase,
+    rr_s21_hanger,
+)
 
 
 class FitModel(Model):
@@ -29,6 +34,22 @@ class FitModel(Model):
             for param, hint in guesses.items():
                 self.set_param_hint(param, **hint)
         return super().make_params(**kwargs)
+
+
+class S21Model(FitModel):
+    """
+    s21 fitting function (no background)
+    TODO write guess fn
+    """
+
+    def __init__(self, *args, **kwargs):
+        """ """
+        fitfn = rr_s21_hanger
+        super().__init__(fitfn, *args, **kwargs)
+
+    def post_fit(self, result):
+        """Calculate Ql, absQc, and Qi from fit result best values and show plot"""
+        result.params.add("Qi", expr="1 / ((1 / Ql) - (cos(phi) / absQc))")
 
 
 class S21PhaseLinearModel(FitModel):
@@ -100,3 +121,46 @@ class S21LogMagModel(FitModel):
         result.params.add("Ql", expr="fr / fwhm")
         result.params.add("absQc", expr="abs(Ql / height)")
         result.params.add("Qi", expr="1 / ((1 / Ql) - (cos(phi) / absQc))")
+
+
+class S21CenteredPhaseModel(FitModel):
+    """ """
+
+    def __init__(self, *args, **kwargs):
+        """ """
+        fitfn = centered_phase
+        super().__init__(fitfn, *args, **kwargs)
+
+    def guess(self, data, f):
+        """ """
+        # guess resonance frequency to lie at the peak of the derivative of the data
+        absdy = np.abs(np.diff(data, prepend=data[0]))
+        fr_i = absdy.argmax()
+        fr_guess = f[fr_i]
+
+        # guess theta offset based on extreme left and right off-resonant data
+        xp = len(f) // 6
+        l_or, r_or = np.average(data[:xp]), np.average(data[-xp:])
+        theta_guess = (l_or + r_or) / 2
+
+        # guess Ql based on the linewidth of the derivative of the data
+        hamp = absdy.max() / 2
+        l, r = absdy[:fr_i], absdy[fr_i:]
+        lhamp_i = np.abs((l - hamp)).argmin()
+        rhamp_i = fr_i + np.abs((r - hamp)).argmin()
+        fwhm_guess = f[rhamp_i] - f[lhamp_i]
+        Ql_guess = fr_guess / fwhm_guess
+        sign = -1 if data[0] < data[-1] else 1
+
+        # set bounds on the guesses and set them as the model's parameter hints
+        guesses = {
+            "theta": {"value": theta_guess},
+            "fr": {"value": fr_guess, "min": f[0], "max": f[-1]},
+            "Ql": {
+                "value": Ql_guess,
+                "min": fr_guess / (f[-1] - f[0]),
+                "max": fr_guess / (f[1] - f[0]),
+            },
+            "sign": {"value": sign, "vary": False},
+        }
+        return self.make_params(guesses=guesses)
