@@ -82,8 +82,8 @@ def fit_s21(s21, f, plot=False, **params):
 
     if plot:
         fig = plt.figure(tight_layout=True, figsize=(12, 12))
-        ft = f"S21 fit [{fr.n: .2g = }, {Qi.n:.2g = },"
-        ft += f" {Ql.n: .2g = }, {absQc.n:.2g = }, {phi.n:.2f = }"
+        ft = f"S21 fit [{fr.n:.2g = }, {Qi.n:.2g = },"
+        ft += f" {Ql.n:.2g = }, {absQc.n:.2g = }, {phi.n:.2f = }"
         fig.suptitle(ft)
         gs = GridSpec(5, 5, figure=fig)
 

@@ -14,7 +14,7 @@ def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
     for param in ["fr", "phi", "Ql", "absQc", "Qi"]:
         title + f"{param} = {params[param]:.2g}, "
     if plot:
-        fig = result.plot(
+        result.plot(
             datafmt=".",
             xlabel="Frequency (MHz)",
             ylabel="|S21| (dB)",
@@ -22,5 +22,4 @@ def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
             fit_kws={"lw": 1.5, "c": "r"},
             title=f"Magnitude fit: {title[:-2]}",
         )
-        fig.show()
     return result
