@@ -128,6 +128,6 @@ def fit_s21(s21, f, plot=False, **params):
         s21_phase_ax.plot(f, s21_phase_fit, ls="--", c="r", label="fit")
         s21_phase_ax.legend()
 
-        fig.show()
+        plt.show()
 
     return fit_params
