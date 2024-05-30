@@ -10,10 +10,11 @@ def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
     """ """
     result = S21LogMagModel().fit(s21_mag, f)
     title = ""
+    params = result.params.valuesdict()
     for param in ["fr", "phi", "Ql", "absQc", "Qi"]:
-        title + f"{param} = {result.best_values[param]:.2g}, "
+        title + f"{param} = {params[param]:.2g}, "
     if plot:
-        result.plot(
+        fig = result.plot(
             datafmt=".",
             xlabel="Frequency (MHz)",
             ylabel="|S21| (dB)",
@@ -21,4 +22,5 @@ def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
             fit_kws={"lw": 1.5, "c": "r"},
             title=f"Magnitude fit: {title[:-2]}",
         )
+        fig.show()
     return result
