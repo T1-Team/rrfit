@@ -9,7 +9,7 @@ from rrfit.circlefit import fit_background, fit_circle
 from rrfit.models import S21Model, S21CenteredPhaseModel
 
 # TODO plot residuals, separate fit and plot, show s21raw, s21nodelay, s21canonical
-
+# TODO find a way for caller to provide experiment specific figtext
 
 def fit_s21(s21, f, plot=False, **params):
     """no cable delay correction"""
@@ -82,10 +82,10 @@ def fit_s21(s21, f, plot=False, **params):
 
     if plot:
         fig = plt.figure(tight_layout=True, figsize=(12, 12))
-        ft = f"S21 fit [{fr.n = :.2g}, {Qi.n = :.2g},"
-        ft += f" {Ql.n = :.2g}, {absQc.n = :.2g}, {phi.n = :.2g}"
+        ft = f"S21 fit [fr = {fr.n:.2g}, Qi = {Qi.n:.2g},"
+        ft += f" Ql = {Ql.n:.2g}, |Qc| = {absQc.n:.2g}, phi = {phi.n:.2g}]"
         fig.suptitle(ft)
-        gs = GridSpec(5, 5, figure=fig)
+        gs = GridSpec(6, 6, figure=fig)
 
         s21_ax = fig.add_subplot(gs[:3, :3])
         s21_ax.set(xlabel="Re(S21)", ylabel="Im(S21)")
