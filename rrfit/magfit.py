@@ -12,7 +12,7 @@ def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
     title = ""
     params = result.params.valuesdict()
     for param in ["fr", "phi", "Ql", "absQc", "Qi"]:
-        title + f"{param} = {params[param]:.2g}, "
+        title += f"{param} = {params[param]:.2g}, "
     if plot:
         result.plot(
             datafmt=".",
