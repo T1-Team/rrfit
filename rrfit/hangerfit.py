@@ -89,7 +89,7 @@ def fit_s21(s21, f, plot=False, **params):
 
         s21_ax = fig.add_subplot(gs[:3, :3])
         s21_ax.set(xlabel="Re(S21)", ylabel="Im(S21)")
-        s21_ax.set(title="Circle fit residuals")
+        s21_ax.set(title="Circle fit")
         s21_ax.set_aspect("equal", "datalim")
         s21_ax.locator_params(axis="both", nbins=6)
         s21_ax.grid(visible=True, alpha=0.5)
