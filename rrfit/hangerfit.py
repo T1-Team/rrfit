@@ -66,7 +66,7 @@ def fit_s21(s21, f, plot=False, **params):
         Ql = s21_result.uvars["Ql"]
         phi = s21_result.uvars["phi"]
         Qi = 1 / ((1 / Ql) - (ucos(phi) / absQc))
-    except AttributeError as err:
+    except (AttributeError, RuntimeError, ZeroDivisionError) as err:
         print(f"Fit failed. Details: {err}")
         fit_failed = True
 
