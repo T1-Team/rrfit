@@ -152,15 +152,13 @@ class S21CenteredPhaseModel(FitModel):
         Ql_guess = fr_guess / fwhm_guess
         sign = -1 if data[0] < data[-1] else 1
 
-        # set bounds on the guesses and set them as the model's parameter hints
+        fspan = f[-1] - f[0]
+        # this fstep estimation works for both linear and homophasal frequency sweeps
+        fstep = np.abs(np.average(np.diff(f)))
         guesses = {
             "theta": {"value": theta_guess},
-            "fr": {"value": fr_guess, "min": f[0], "max": f[-1]},
-            "Ql": {
-                "value": Ql_guess,
-                "min": fr_guess / (f[-1] - f[0]),
-                "max": fr_guess / (f[1] - f[0]),
-            },
+            "fr": {"value": fr_guess, "min": min(f), "max": max(f)},
+            "Ql": {"value": Ql_guess, "min": fr_guess / fspan, "max": fr_guess / fstep},
             "sign": {"value": sign, "vary": False},
         }
         return self.make_params(guesses=guesses)
