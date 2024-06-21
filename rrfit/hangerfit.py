@@ -22,17 +22,17 @@ def fit_s21(s21, f, plot=False, **params):
     s21nodelay = np.copy(s21)
 
     # find off-resonant point
-    discont = params.get("discont")
+    discont = params.get("discont", 1.5 * np.pi)
     orp = fit_background(s21, f, discont=discont)
     s21 /= orp
     s21canonical = np.copy(s21)
 
     ## circle and phase fit to extract resonator parameters
     radius, center = fit_circle(s21)
-    s21cphase = np.unwrap(np.angle((s21 - center)), discont=discont)
 
     phase_model = S21CenteredPhaseModel()
-    phase_result = phase_model.fit(s21cphase, f)
+    centered_phase = phase_model.center_phase(s21 - center, discont=discont)
+    phase_result = phase_model.fit(centered_phase, f)
     fr_guess = phase_result.best_values["fr"]
     Ql_guess = phase_result.best_values["Ql"]
 

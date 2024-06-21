@@ -9,6 +9,7 @@ from scipy import optimize
 
 from rrfit.models import S21CenteredPhaseModel
 
+
 def fit_circle(s21):
     """
     we assume our n data points approximately form a circle A*zi + B*xi + C*yi + D ~ 0
@@ -151,13 +152,14 @@ def get_circle_coeffs(M):
     w, v = np.linalg.eigh(M)
     return v[:, np.argmin(w)]
 
-def fit_background(s21, f, discont=None):
+
+def fit_background(s21, f, discont=1.5 * np.pi):
     """ """
     radius, center = fit_circle(s21)
-    s21cphase = np.unwrap(np.angle((s21 - center)), discont=discont)
 
     model = S21CenteredPhaseModel()
-    result = model.fit(s21cphase, f)
+    centered_phase = model.center_phase(s21 - center, discont=discont)
+    result = model.fit(centered_phase, f)
 
     theta = result.best_values["theta"]
     beta = ((theta + np.pi) % (2 * np.pi)) - np.pi

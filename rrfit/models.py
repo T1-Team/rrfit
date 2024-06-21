@@ -131,6 +131,24 @@ class S21CenteredPhaseModel(FitModel):
         fitfn = centered_phase
         super().__init__(fitfn, *args, **kwargs)
 
+    def center_phase(self, centered_s21, discont=1.5 * np.pi):
+        """transform centered complex S21 into continuous unwrapped centered phase"""
+        cphase = np.angle(centered_s21)
+
+        windowx = 0.1  # TODO CHANGE HARDCODED VALUE
+        points = len(centered_s21)
+        left = points // 2 - int(points * windowx)
+        right = points // 2 + int(points * windowx)
+
+        cphase_unwrapped = np.unwrap(cphase[left:right], discont=discont)
+        unwrap_diff_window = cphase_unwrapped - cphase[left:right]
+        left_pad = np.repeat(unwrap_diff_window[0], left)
+        right_pad = np.repeat(unwrap_diff_window[-1], right)
+
+        unwrap_diff = np.concatenate((left_pad, unwrap_diff_window, right_pad))
+        cphase += unwrap_diff
+        return cphase
+
     def guess(self, data, f):
         """ """
         # guess resonance frequency to lie at the peak of the derivative of the data
