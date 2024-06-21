@@ -123,7 +123,7 @@ def fit_s21(s21, f, plot=False, **params):
         s21_cp_ax.set(xlabel="Frequency (Hz)", ylabel="arg(S21c) (rad)")
         s21_cp_ax.set(title="Centered phase fit")
         s21_cp_ax.locator_params(axis="both", nbins=6)
-        s21_cp_ax.scatter(f, s21cphase, s=3, c="k", label="data")
+        s21_cp_ax.scatter(f, centered_phase, s=3, c="k", label="data")
 
         s21_mag_ax = fig.add_subplot(gs[3:, :3])
         s21_mag_ax.set(xlabel="Frequency (Hz)", ylabel="|S21| (dB)")
