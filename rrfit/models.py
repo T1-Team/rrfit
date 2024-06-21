@@ -143,7 +143,7 @@ class S21CenteredPhaseModel(FitModel):
         cphase_unwrapped = np.unwrap(cphase[left:right], discont=discont)
         unwrap_diff_window = cphase_unwrapped - cphase[left:right]
         left_pad = np.repeat(unwrap_diff_window[0], left)
-        right_pad = np.repeat(unwrap_diff_window[-1], right)
+        right_pad = np.repeat(unwrap_diff_window[-1], points - right)
 
         unwrap_diff = np.concatenate((left_pad, unwrap_diff_window, right_pad))
         cphase += unwrap_diff
