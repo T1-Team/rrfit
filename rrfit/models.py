@@ -8,6 +8,7 @@ from rrfit.fitfns import (
     cable_delay_linear,
     centered_phase,
     rr_s21_hanger,
+    Qivsnbar,
 )
 
 
@@ -135,10 +136,12 @@ class S21CenteredPhaseModel(FitModel):
         """transform centered complex S21 into continuous unwrapped centered phase"""
         cphase = np.angle(centered_s21)
 
-        windowx = 0.1  # TODO CHANGE HARDCODED VALUE
+        windowx = 0.25  # TODO CHANGE HARDCODED VALUE
         points = len(centered_s21)
-        left = points // 2 - int(points * windowx)
-        right = points // 2 + int(points * windowx)
+
+        middle = np.argmax(np.abs(np.diff(cphase)))
+        left = max(0, middle - int(points * windowx))
+        right = min(middle + int(points * windowx), points)
 
         cphase_unwrapped = np.unwrap(cphase[left:right], discont=discont)
         unwrap_diff_window = cphase_unwrapped - cphase[left:right]
@@ -178,5 +181,30 @@ class S21CenteredPhaseModel(FitModel):
             "fr": {"value": fr_guess, "min": min(f), "max": max(f)},
             "Ql": {"value": Ql_guess, "min": fr_guess / fspan, "max": fr_guess / fstep},
             "sign": {"value": sign, "vary": False},
+        }
+        return self.make_params(guesses=guesses)
+
+class QivsnbarModel(FitModel):
+    """ """
+
+    def __init__(self, fr, temp, *args, **kwargs):
+        """ """
+        fitfn = Qivsnbar
+        self.fr = fr
+        self.temp = temp
+        super().__init__(fitfn, *args, **kwargs)
+
+    def guess(self, data, x):
+        """ """
+        qtls0_guess = 10 ** np.floor(np.log10(np.abs(np.min(data))))
+        qother_guess = 10 ** np.ceil(np.log10(np.abs(np.max(data))))
+        nc_guess = 10 ** np.ceil(np.log10(np.abs(np.min(x))))
+        guesses = {
+            "qtls0": {"value": qtls0_guess, "min": 0, "max": qother_guess},
+            "nc": {"value": nc_guess, "min": 0, "max": max(x)}, 
+            "beta": {"value": 1, "min": 0},
+            "Qother": {"value": qother_guess, "min": qtls0_guess},
+            "fr": {"value": self.fr, "vary": False},
+            "temp": {"value": self.temp, "vary": False},
         }
         return self.make_params(guesses=guesses)

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rrfit"
-version = "0.1.0"
+version = "0.2.0"
 description = ""
 authors = ["T1-Team <deleonlab@princeton.edu>"]
 readme = "README.md"
@@ -10,7 +10,14 @@ python = "^3.10"
 lmfit = "^1.3.1"
 numpy = "^1.26.4"
 matplotlib = "^3.8.4"
+h5py = "^3.11.0"
+scipy = "^1.14.1"
+uncertainties = "^3.2.2"
 
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.17.1"
+black = "^22.10.0"
+notebook = "^7.2.1"
 
 [build-system]
 requires = ["poetry-core"]

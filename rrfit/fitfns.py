@@ -1,6 +1,30 @@
 """ """
 
 import numpy as np
+from scipy.constants import h, k
+
+
+def dBmtoW(pow_dbm):
+    """ """
+    return np.power(10, (pow_dbm - 30) / 10)
+
+
+def nbarvsPin(Pin, fr, Ql, avgQc):
+    """no impedance factor"""
+    return (1 / (h * np.pi * fr**2)) * (Ql**2 / avgQc) * Pin
+
+
+def QTLS(nbar, qtls0, nc, beta, fr, temp):
+    """currently used to fit the base temp power sweep data"""
+    tanh_term = np.tanh((h * fr) / (k * temp))
+    sqrt_term = np.sqrt(1 + np.power(nbar / nc, beta))
+    return qtls0 * sqrt_term / tanh_term
+
+
+def Qivsnbar(x, qtls0, nc, beta, Qother, fr, temp):
+    """x: nbar"""
+    qtls = QTLS(x, qtls0, nc, beta, fr, temp)
+    return 1 / (1 / qtls + 1 / Qother)
 
 
 def rr_s21_hanger(x, fr, Ql, absQc, phi=0, a=1, alpha=0, tau=0):

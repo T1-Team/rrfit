@@ -3,6 +3,7 @@
 import matplotlib.pyplot as plt
 
 from rrfit.models import S21PhaseLinearModel
+from rrfit.plotfns import plot_delayfit
 
 
 def fit_cable_delay(s21_phase, f, exclude=None, plot=False) -> float:
@@ -17,14 +18,7 @@ def fit_cable_delay(s21_phase, f, exclude=None, plot=False) -> float:
         result = model.fit(s21_phase, f)
         tau = result.best_values["tau"]
         if plot:
-            result.plot(
-                datafmt=".",
-                xlabel="Frequency (MHz)",
-                ylabel="arg(S21) (rad)",
-                data_kws={"ms": 2, "c": "k"},
-                fit_kws={"lw": 1.5, "c": "r"},
-                title=f"Fitted cable delay: {tau:.3e}s",
-            )
+            plot_delayfit(f, s21_phase, result.best_fit, result.residual, tau)
         return tau
 
     # fit left-most and right-most data points each to a linear model

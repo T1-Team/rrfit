@@ -12,7 +12,7 @@ from rrfit.models import S21Model, S21CenteredPhaseModel
 # TODO find a way for caller to provide experiment specific figtext
 
 
-def fit_s21(s21, f, plot=False, **params):
+def fit_s21(s21, f, plot=False, figsize=(12, 12), **params):
     """no cable delay correction"""
     s21raw = np.copy(s21)
 
@@ -106,7 +106,7 @@ def fit_s21(s21, f, plot=False, **params):
         fig_title = "S21 data, fit errored out"
 
     if plot:
-        fig = plt.figure(tight_layout=True, figsize=(12, 12))
+        fig = plt.figure(tight_layout=True, figsize=figsize)
         fig.suptitle(fig_title)
         gs = GridSpec(6, 6, figure=fig)
 
