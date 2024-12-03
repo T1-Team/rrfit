@@ -29,6 +29,7 @@ class Trace:
     phi: float = None
     phi_err: float = None
     is_excluded: bool = None
+    is_homophasal: bool = None
 
 
 @dataclass
@@ -70,6 +71,7 @@ def load_data(*folders: Path, **devices: Device):
                         absQc_err=file.attrs.get("absQc_err"),
                         phi=file.attrs.get("phi"),
                         phi_err=file.attrs.get("phi_err"),
+                        is_homophasal=file.attrs.get("do_homophasal"),
                     )
                     devices[device_name].traces.append(trace)
 

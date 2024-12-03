@@ -1,10 +1,12 @@
 """ functions to fit QTLS0 from Qint vs nbar or FFS vs temp data"""
 
 import numpy as np
+import lmfit
+from scipy.constants import k, hbar
 import matplotlib.pyplot as plt
 
 from rrfit.dataio import Device
-from rrfit.fitfns import dBmtoW, nbarvsPin
+from rrfit.fitfns import dBmtoW, nbarvsPin, Qivsnbar
 from rrfit.models import QivsnbarModel
 
 
@@ -31,13 +33,23 @@ def fit_qtls0(device: Device):
     result = QivsnbarModel(fr=fr_avg, temp=temp_avg).fit(Qi, nbar)
     print(result.fit_report())
 
+    device.qtls0 = result.best_values["qtls0"]
+    device.qtls0_err = result.params["qtls0"].stderr
+
     fig, (res_ax, data_ax) = plt.subplots(2, 1, sharex=True, height_ratios=(1, 4))
-    fig.suptitle(f"QTLS0 from Qi vs nbar")
+    #fig.suptitle(f"Device '{device.name}' (pitch {device.pitch}um) QTLS0 from Qi vs nbar")
+    nbar_interp = np.linspace(min(nbar), max(nbar), 101)
+    qint_interp = Qivsnbar(nbar_interp,
+                           result.best_values["qtls0"],
+                           result.best_values["nc"],
+                           result.best_values["beta"],
+                           result.best_values["Qother"],
+                           fr_avg, temp_avg)
     res_ax.scatter(nbar, result.residual, s=8, c="k")
     res_ax.set(xlabel="nbar", ylabel="residuals")
     data_ax.errorbar(nbar, Qi, yerr=Qi_err, fmt="ko", label="data")
     #data_ax.errorbar(nbar, Qi, yerr=0, fmt="ko", label="data")
-    data_ax.plot(nbar, result.best_fit, c="r", ls="--", label="best fit")
+    data_ax.plot(nbar_interp, qint_interp, c="r", ls="--", label="best fit")
     data_ax.set(xlabel="nbar", ylabel="Qi", yscale="log", xscale="log")
     data_ax.legend()
     fig.tight_layout()

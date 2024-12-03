@@ -132,11 +132,10 @@ class S21CenteredPhaseModel(FitModel):
         fitfn = centered_phase
         super().__init__(fitfn, *args, **kwargs)
 
-    def center_phase(self, centered_s21, discont=1.5 * np.pi):
+    def center_phase(self, centered_s21, discont=1.5 * np.pi, windowx=0.25):
         """transform centered complex S21 into continuous unwrapped centered phase"""
         cphase = np.angle(centered_s21)
 
-        windowx = 0.25  # TODO CHANGE HARDCODED VALUE
         points = len(centered_s21)
 
         middle = np.argmax(np.abs(np.diff(cphase)))
@@ -171,7 +170,9 @@ class S21CenteredPhaseModel(FitModel):
         rhamp_i = fr_i + np.abs((r - hamp)).argmin()
         fwhm_guess = f[rhamp_i] - f[lhamp_i]
         Ql_guess = fr_guess / fwhm_guess
+        
         sign = -1 if data[0] < data[-1] else 1
+        #sign = 1
 
         fspan = f[-1] - f[0]
         # this fstep estimation works for both linear and homophasal frequency sweeps

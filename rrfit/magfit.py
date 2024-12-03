@@ -8,7 +8,7 @@ from rrfit.models import S21LogMagModel
 
 def fit_magnitude(s21_mag, f, plot=False) -> ModelResult:
     """ """
-    result = S21LogMagModel().fit(s21_mag, f)
+    result = S21LogMagModel().fit(s21_mag, f, method="least_squares")
     title = ""
     params = result.params.valuesdict()
     for param in ["fr", "phi", "Ql", "absQc", "Qi"]:

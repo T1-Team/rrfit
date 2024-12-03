@@ -7,9 +7,10 @@ import matplotlib.pyplot as plt
 import numpy as np
 from rrfit.fitfns import nbarvsPin, dBmtoW
 import random
+import matplotlib.cm as cm
 
 def QTLSFunc(nbar, qtls0, beta_1, beta_2, D, fr, temp):
-    tanh_term = np.tanh((h * fr) / (k * temp))
+    tanh_term = np.tanh((h * fr) / (2 * k * temp))
     sqrt_term = np.sqrt(1 + (np.power(nbar, beta_2) / (D * np.power(temp, beta_1))) * tanh_term)
     return qtls0 * sqrt_term / tanh_term
 
@@ -51,7 +52,7 @@ def QIntVsTemp_consistent(temp, params, freq0, power, Qc, Qint_init):
         QintParam = Parameters()
         QintParam.add('Qint', value=Qint_init[i], min=Qint_init[i]/50)
 
-        out = minimize(consistentQintError, params=QintParam, args=(params, temp[i], freq0[i], currentPower, Qc))
+        out = minimize(consistentQintError, params=QintParam, args=(params, temp[i], freq0[i], currentPower, Qc), method="least_squares")
 
         QInt[i] = out.params['Qint'].value
     return QInt
@@ -61,7 +62,8 @@ def QIntVsTemp_consistent_error_function(params, temps, freq0, power, Qc, Qint_i
     resid = []
 
     for i in range(len(temps)):
-        res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0]) / errors[i]
+        #res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0]) / errors[i]
+        res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0])
         #print(f"{res}")
         resid.append(res)
     return np.hstack(resid)
@@ -99,10 +101,9 @@ def QIntVsTemp_TLS_QP_Beta_fit_usingParams(temp, params, freq0, nbar, powerID, z
 def QIntVsTemp_TLS_QP_Beta_error_function_usingParams(params, temps, data, freq0, nbarLis, powerIDs, errors):
     resid = []
     for i in range(len(temps)):
-        val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i],\
-                                                                powerIDs)) / errors[i]
+        #val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i], powerIDs)) / errors[i]
+        val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i], powerIDs))
         resid.append(val)
-
     return np.hstack(resid)
 
 def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc=QIntVsTemp_consistent):
@@ -116,7 +117,11 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
         data[trace.power].append(trace)
 
     fig, ax = plt.subplots(figsize=figsize)    
-    fig.suptitle(f"Device {device.name}: Qi vs temp")
+    #fig.suptitle(f"Device {device.name} (pitch = {device.pitch}um): Qi vs temp")
+
+    uniquePowers = {tr.power for tr in device.traces if not tr.is_excluded}
+    C = cm.rainbow(np.linspace(1, 0, len(uniquePowers)))
+
     for idx, (power, traces) in enumerate(sorted(data.items(), reverse=True)):
         traces.sort(key=lambda x: x.temperature)
         temp = np.array([tr.temperature for tr in traces])
@@ -128,6 +133,8 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
         devPowerArray_W = np.array([dBmtoW(tr.power - device.attenuation) for tr in traces])
 
        #ax.errorbar(temp, Qi, yerr=Qi_err, mec=f"C{idx}", ls="", mfc=f"C{idx}", marker="o", ms=6, label=f"{power:.1f} dBm")
+
+        color = C[idx] #f"C{idx}"
 
         if not plotParams is None:
             if fitFunc == QIntVsTemp_consistent:
@@ -168,35 +175,42 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
                         
                 # plot the final data
                 ax.plot(tempAxis, ys, label='{0:.1f} dBm'.format(power),
-                        color=f"C{idx}")
+                        color=color)
             else:
                 # calculate the nbar array from data
                 nbarArray = nbarvsPin(devPowerArray_W, freq0List, Ql, Qc)
                 ys = fitFunc(temp, plotParams, freq0List,
                              nbarArray, 0)
                 ax.plot(temp, ys, label='{0:.1f} dBm'.format(power),
-                        color=f"C{idx}")
+                        color=color)
             
             ax.errorbar(temp, Qi, Qi_err,
-                        marker='o', markersize=3., alpha=0.8,
+                        marker='o', markersize=8, alpha=0.8,
                         linewidth=0,
-                        markeredgecolor=f"C{idx}", markeredgewidth=1,
-                        markerfacecolor=f"C{idx}", zorder=1, elinewidth=1,
+                        markeredgecolor=color, markeredgewidth=1,
+                        markerfacecolor=color, zorder=1, elinewidth=1,
                         capsize=4, ecolor='k')
 
         else:
             ax.errorbar(temp, Qi, Qi_err,
-                        marker='o', markersize=3., alpha=0.8,
+                        marker='o', markersize=8, alpha=0.8,
                         linewidth=0,
-                        markeredgecolor=f"C{idx}", markeredgewidth=1,
-                        markerfacecolor=f"C{idx}", zorder=1, elinewidth=1,
+                        markeredgecolor=color, markeredgewidth=1,
+                        markerfacecolor=color, zorder=1, elinewidth=1,
                         capsize=4, ecolor='k',
                         label='{0:.1f} dBm'.format(power))
 
-    ax.set(xlabel="Temperature (K)", ylabel="Qi", yscale="log")
-    ax.legend()
+    ax.tick_params(axis='both', which='major', labelsize=16, size=8, width=2)
+    ax.tick_params(which='minor', size=4, width=2)
+    for spine in ax.spines.values():
+        spine.set_linewidth(2)
+
+    ax.set_xlabel(r"Temperature ($K$)", fontsize=16)
+    ax.set_ylabel(r"$Q_{int}$", fontsize=16)
+    ax.set_yscale("log")
+    ax.legend(frameon=False)
     fig.tight_layout()
-    plt.show()
+    #plt.show()
     return fig, ax
 
 ####################################################################################################################
@@ -224,16 +238,17 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
 #   finalDict - same as initDict, but saves the result of the fit
 #   red_chi2 - numpy array, length numIter - reduced chi2 values corresponding to the fits
 #   and a list of figures created if makePlot=True
-def fitIterated(device, boundsDict, numIter, consistent=False, makePlot=True, fitQP=True, retries = 10):
-    
-    init_params = Parameters()
-    init_params.add('delta_QP0', value=2e-4)
-    init_params.add('Q_TLS0', value=1e6, min=1e4)
-    init_params.add('tc', value=0.5, min=0.1, max=1)
-    init_params.add('Q_other', value=1e6, min=1e5)
-    init_params.add('beta', value=1, min=0, max=10.0)
-    init_params.add('beta2', value=1, min=0, max=10.0)
-    init_params.add('D_0', value=100, min=0, max=1e6)
+def fitIterated(device, boundsDict, numIter, consistent=False, makePlot=True, fitQP=True, retries = 10, init_params=None):
+
+    if init_params is None:
+        init_params = Parameters()
+        init_params.add('delta_QP0', value=2e-4, min=0)
+        init_params.add('Q_TLS0', value=1e6, min=0)
+        init_params.add('tc', value=2.0, min=0.0, max=4.5)
+        init_params.add('Q_other', value=1e7, min=0)
+        init_params.add('beta', value=1, min=0, max=2.0)
+        init_params.add('beta2', value=1, min=0, max=2.0)
+        init_params.add('D_0', value=100, min=0)
     setattr(device, "best_params", init_params.copy())
 
     # initialize output variables
@@ -267,10 +282,10 @@ def fitIterated(device, boundsDict, numIter, consistent=False, makePlot=True, fi
                     finalDict[param][i] = params[param].value
                 red_chi2_arr[i] = red_chi2
                 check = False
-            except ValueError:
+            except ValueError as err:
                 retry_count += 1
                 if retry_count >= retries:
-                    print(f"Fit aborted! Exceeded {retries = } for {ValueError = }")
+                    print(f"Fit aborted! Exceeded {retries = } for {err = }")
                     return
             #    pass
     # create summary plots, if requested
@@ -374,7 +389,8 @@ def Fit_QIntVsTemp(device, init_params, consistent=False, makePlot=True):
     if consistent:
         print("Starting consistent fit...")
         out_main = minimize(QIntVsTemp_consistent_error_function, init_params, \
-                args=(tempArray, freq0Array, devPowerArray_W, Qc, QIntArray, QIntArray, QIntErrArray))
+                args=(tempArray, freq0Array, devPowerArray_W, Qc, QIntArray, QIntArray, QIntErrArray),
+                method="least_squares")
         print("Done consistent fit")
         #if out_main.params['Q_other'].stderr is None:
         #    self.initParams_QIntVsTemp.pop('Q_other')
@@ -387,7 +403,8 @@ def Fit_QIntVsTemp(device, init_params, consistent=False, makePlot=True):
         #    out_main.params.add('Q_other', value=np.Inf, min=0, vary=False)
     else:
         out_main = minimize(QIntVsTemp_TLS_QP_Beta_error_function_usingParams, init_params, \
-                args=(tempArray, QIntArray, freq0Array, nbarArray, 0, QIntErrArray))
+                args=(tempArray, QIntArray, freq0Array, nbarArray, 0, QIntErrArray),
+                method="least_squares")
     fit_params = out_main.params
     final_red_chi2 = out_main.redchi
     device.waterfall_fit_result = out_main
@@ -398,10 +415,10 @@ def Fit_QIntVsTemp(device, init_params, consistent=False, makePlot=True):
             fitFunc = QIntVsTemp_consistent
         else:
             fitFunc = QIntVsTemp_TLS_QP_Beta_fit_usingParams
-        initFig, ax = plot_Qi_vs_temp(device, fitFunc=fitFunc, plotParams=init_params)
-        ax.set_title('Init params, ' + device.name)
+        initFig = None #initFig, ax = plot_Qi_vs_temp(device, fitFunc=fitFunc, plotParams=init_params)
+        #ax.set_title('Init params, ' + device.name)
         fittedFig, ax = plot_Qi_vs_temp(device, fitFunc=fitFunc, plotParams=out_main.params)
-        ax.set_title('Fitted params, ' + device.name)
+        #ax.set_title('Fitted params, ' + device.name)
         # Print out fit parameters:
         report_fit(out_main)
         print('Reduced Chi Squared: {0:.2f}'.format(out_main.redchi))
