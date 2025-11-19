@@ -207,7 +207,6 @@ def fit_s21_v2(trace, plot=False, figsize=(12, 12), xpts=5, phase_err_threshold=
     phase_fit_idx = slice(None, None)
     theta_orp = np.pi
     if theta_1_relative_err > phase_err_threshold:
-        print("IMPLEMENTING NEW PHASE FIT ROUTINE...")
         left = np.average(s21_cp[:xpts])
         right = np.average(s21_cp[-xpts:])
         theta_orp = (left + right) / 2
