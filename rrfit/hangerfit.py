@@ -174,7 +174,7 @@ def fit_s21(
     return fit_params
 
 
-def fit_s21_v2(trace, plot=False, figsize=(12, 12), xpts=5, phase_err_threshold=0.01):
+def fit_s21_v2(trace, plot=False, figsize=(12, 12), xpts=5, phase_err_threshold=0.01, plot_title=""):
     s21 = trace.s21real + 1j * trace.s21imag
     s21 *= np.exp(-1j * 2 * np.pi * trace.frequency * trace.tau)
     radius_1, center_1 = fit_circle(s21)
@@ -325,54 +325,57 @@ def fit_s21_v2(trace, plot=False, figsize=(12, 12), xpts=5, phase_err_threshold=
     for name, value in fit_params.items():
         setattr(trace, name, value)
 
+    freq_diff = (trace.frequency - trace.fr) * 1e-3 # kHz
+
     fig = plt.figure(tight_layout=True, figsize=figsize)
+    fig.suptitle(plot_title)
     gs = GridSpec(6, 6, figure=fig)
     s21_ax = fig.add_subplot(gs[:3, :3])
-    s21_ax.set(xlabel="Re(S21)", ylabel="Im(S21)")
+    s21_ax.set(xlabel=r"Re($S_{21}$)", ylabel=r"Im($S_{21}$)")
     s21_ax.set(title="Circle fit")
     s21_ax.set_aspect("equal", "datalim")
     s21_ax.locator_params(axis="both", nbins=6)
     s21_ax.grid(visible=True, alpha=0.5)
-    s21_ax.scatter(s21_2.real, s21_2.imag, s=3, c="k", label="data")
+    s21_ax.scatter(s21_2.real, s21_2.imag, s=12, c="k", label="data")
     s21_ax.scatter(s21_2.real[0], s21_2.imag[0], s=16, c="g")
     s21_ax.scatter(rp_2.real, rp_2.imag, s=16, c="m")
     s21_ax.scatter(orp_2.real, orp_2.imag, s=16, c="r")
     s21_cp_ax = fig.add_subplot(gs[:3, 3:])
-    s21_cp_ax.set(xlabel="Frequency (Hz)", ylabel="arg(S21c) (rad)")
+    s21_cp_ax.set(xlabel="Frequency (kHz)", ylabel=r"arg($S_{21}$) (rad)")
     s21_cp_ax.set(title="Centered phase fit")
     s21_cp_ax.locator_params(axis="both", nbins=6)
     s21_mag_ax = fig.add_subplot(gs[3:, :3])
-    s21_mag_ax.set(xlabel="Frequency (Hz)", ylabel="|S21| (dB)")
+    s21_mag_ax.set(xlabel="Frequency (kHz)", ylabel=r"$|S_{21}|$ (dB)")
     s21_mag_ax.set(title="Fitted S21 Magnitude")
     s21_mag_ax.locator_params(axis="both", nbins=6)
     s21_mag = 20 * np.log10(np.abs(s21_2))
-    s21_mag_ax.scatter(trace.frequency, s21_mag, s=3, c="k", label="data")
+    s21_mag_ax.scatter(freq_diff, s21_mag, s=12, c="k", label="data")
     s21_phase_ax = fig.add_subplot(gs[3:, 3:])
-    s21_phase_ax.set(xlabel="Frequency (Hz)", ylabel="arg(S21) (rad)")
+    s21_phase_ax.set(xlabel="Frequency (kHz)", ylabel=r"arg($S_{21}$) (rad)")
     s21_phase_ax.set(title="Fitted S21 Phase")
     s21_phase_ax.locator_params(axis="both", nbins=6)
     s21_phase = np.unwrap(np.angle(s21_2))
-    s21_phase_ax.scatter(trace.frequency, s21_phase, s=3, c="k", label="data")
+    s21_phase_ax.scatter(freq_diff, s21_phase, s=12, c="k", label="data")
     s21_best_fit = s21_result.best_fit
     s21_ax.plot(s21_best_fit.real, s21_best_fit.imag, ls="--", c="r", label="fit")
     s21_cp_ax.scatter(
-        trace.frequency[phase_fit_idx],
+        freq_diff[phase_fit_idx],
         s21_cp_unwrapped[phase_fit_idx],
-        s=3,
+        s=12,
         c="k",
         label="data",
     )
     s21_cp_ax.plot(
-        trace.frequency[phase_fit_idx],
+        freq_diff[phase_fit_idx],
         cp_result_1.best_fit,
         ls="--",
         c="r",
         label="fit",
     )
     s21_mag_fit = 20 * np.log10(np.abs(s21_best_fit))
-    s21_mag_ax.plot(trace.frequency, s21_mag_fit, ls="--", c="r", label="fit")
+    s21_mag_ax.plot(freq_diff, s21_mag_fit, ls="--", c="r", label="fit")
     s21_phase_fit = np.unwrap(np.angle(s21_best_fit))
-    s21_phase_ax.plot(trace.frequency, s21_phase_fit, ls="--", c="r", label="fit")
+    s21_phase_ax.plot(freq_diff, s21_phase_fit, ls="--", c="r", label="fit")
     s21_ax.legend()
     s21_cp_ax.legend()
     s21_mag_ax.legend()
