@@ -37,7 +37,7 @@ class Device:
     name: str = None
     pitch: float = None
     traces: list[Trace] = None
-    input_attenuation: float = None
+    line_attenuation: float = None
 
 
 def load_data(*folders: Path, **devices: Device):

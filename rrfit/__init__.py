@@ -1,4 +1,4 @@
-__version__ = "1.0.2"
+__version__ = "1.0.3"
 
 from rrfit.delayfit import fit_cable_delay
 from rrfit.magfit import fit_magnitude

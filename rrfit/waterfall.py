@@ -130,7 +130,7 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
         Qc = np.mean(np.array([tr.absQc for tr in traces]))
         Ql = np.array([tr.Ql for tr in traces])
         freq0List = np.array([tr.fr for tr in traces])
-        devPowerArray_W = np.array([dBmtoW(tr.power - device.input_attenuation) for tr in traces])
+        devPowerArray_W = np.array([dBmtoW(tr.power - device.line_attenuation) for tr in traces])
 
        #ax.errorbar(temp, Qi, yerr=Qi_err, mec=f"C{idx}", ls="", mfc=f"C{idx}", marker="o", ms=6, label=f"{power:.1f} dBm")
 
@@ -174,17 +174,17 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
                                  Qc, ys)
                         
                 # plot the final data
-                ax.plot(tempAxis, ys, label='{0:.1f} dBm'.format(power),
-                        color=color)
+                ax.plot(tempAxis * 1e3, ys, label='{0:.1f} dBm'.format(power),
+                        color=color, linewidth=2)
             else:
                 # calculate the nbar array from data
                 nbarArray = nbarvsPin(devPowerArray_W, freq0List, Ql, Qc)
                 ys = fitFunc(temp, plotParams, freq0List,
                              nbarArray, 0)
-                ax.plot(temp, ys, label='{0:.1f} dBm'.format(power),
-                        color=color)
+                ax.plot(temp * 1e3, ys, label='{0:.1f} dBm'.format(power),
+                        color=color, linewidth=2)
             
-            ax.errorbar(temp, Qi, Qi_err,
+            ax.errorbar(temp * 1e3, Qi, Qi_err,
                         marker='o', markersize=8, alpha=0.8,
                         linewidth=0,
                         markeredgecolor=color, markeredgewidth=1,
@@ -192,7 +192,7 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
                         capsize=4, ecolor='k')
 
         else:
-            ax.errorbar(temp, Qi, Qi_err,
+            ax.errorbar(temp * 1e3, Qi, Qi_err,
                         marker='o', markersize=8, alpha=0.8,
                         linewidth=0,
                         markeredgecolor=color, markeredgewidth=1,
@@ -200,13 +200,13 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
                         capsize=4, ecolor='k',
                         label='{0:.1f} dBm'.format(power))
 
-    ax.tick_params(axis='both', which='major', labelsize=16, size=8, width=2)
+    ax.tick_params(axis='both', which='major', labelsize=30, size=8, width=2)
     ax.tick_params(which='minor', size=4, width=2)
     for spine in ax.spines.values():
         spine.set_linewidth(2)
 
-    ax.set_xlabel(r"Temperature ($K$)", fontsize=16)
-    ax.set_ylabel(r"$Q_{int}$", fontsize=16)
+    ax.set_xlabel(r"Temperature (mK)", fontsize=30)
+    ax.set_ylabel(r"$Q_{int}$", fontsize=30)
     ax.set_yscale("log")
     ax.legend(frameon=False)
     fig.tight_layout()
@@ -330,8 +330,8 @@ def createFitHistograms(device, initDict, finalDict, boundsDict, red_chi2, probC
                              30)
         hax[i].hist(initDict[param][indsToKeep], myBins, label='initial', alpha=0.7)
         hax[i].hist(finalDict[param][indsToKeep], myBins, label='final', alpha=0.7)
-        hax[i].axvline(x=boundsDict[param][0], color='k', linestyle='--', label='initial guess bounds')
-        hax[i].axvline(x=boundsDict[param][1], color='k', linestyle='--')
+        hax[i].axvline(x=boundsDict[param][0], color='k', linestyle='--', label='initial guess bounds', linewidth=2)
+        hax[i].axvline(x=boundsDict[param][1], color='k', linestyle='--', linewidth=2)
         hax[i].set_xlabel(param)
         hax[i].set_ylabel('Counts')
         if i == 6:  # add legend to last plot only
@@ -369,7 +369,7 @@ def Fit_QIntVsTemp(device, init_params, consistent=False, makePlot=True):
     
     traces = [tr for tr in device.traces if not tr.is_excluded]
 
-    line_attenuation = getattr(device, "attenuation", 0)
+    line_attenuation = getattr(device, "line_attenuation", 0)
 
     devPowerArray_W = np.array([dBmtoW(tr.power - line_attenuation) for tr in traces])
     tempArray = np.array([tr.temperature for tr in traces])
