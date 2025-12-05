@@ -130,7 +130,7 @@ def plot_Qi_vs_temp(device: Device, figsize =(12, 8), plotParams = None, fitFunc
         Qc = np.mean(np.array([tr.absQc for tr in traces]))
         Ql = np.array([tr.Ql for tr in traces])
         freq0List = np.array([tr.fr for tr in traces])
-        devPowerArray_W = np.array([dBmtoW(tr.power - device.attenuation) for tr in traces])
+        devPowerArray_W = np.array([dBmtoW(tr.power - device.input_attenuation) for tr in traces])
 
        #ax.errorbar(temp, Qi, yerr=Qi_err, mec=f"C{idx}", ls="", mfc=f"C{idx}", marker="o", ms=6, label=f"{power:.1f} dBm")
 
