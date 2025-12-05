@@ -9,7 +9,8 @@ from matplotlib.gridspec import GridSpec
 from rrfit.circlefit import fit_circle
 from rrfit.dataio import Trace, Device
 from rrfit.fitfns import rr_s21_hanger, centered_phase
-#from rrfit.waterfall import QIntVsTemp_consistent
+
+# from rrfit.waterfall import QIntVsTemp_consistent
 from rrfit.hangerfit import fit_s21
 
 
@@ -30,7 +31,7 @@ def plot_delayfit(x, data, best_fit, residuals, tau):
     plt.show()
 
 
-def plot_hangerfit(trace: Trace, do_fit: bool = False):
+def plot_hangerfit(trace: Trace, do_fit: bool = False, plot_title="", figsize=(12, 12)):
     """do_fit = True will refit Trace and overwrite any existing fit param values"""
 
     # get raw s21
@@ -59,10 +60,10 @@ def plot_hangerfit(trace: Trace, do_fit: bool = False):
     empty = h5py._hl.base.Empty
     temp = trace.temperature
     temp_fmt = "" if type(temp) is empty else f"{temp * 1e3:.2f}mK"
-    figtitle = (
-        f"S21 hanger fit for device {trace.device_name} trace #{trace.id} at "
-        f"{trace.power:.1f}dBm {temp_fmt}\n"
-    )
+    # figtitle = (
+    #    f"S21 hanger fit for device {trace.device_name} trace #{trace.id} at "
+    #    f"{trace.power:.1f}dBm {temp_fmt}\n"
+    # )
 
     # extract s21 best fit from Trace, if available
     s21_args = (trace.frequency, trace.fr, trace.Ql, trace.absQc, trace.phi)
@@ -70,13 +71,13 @@ def plot_hangerfit(trace: Trace, do_fit: bool = False):
         s21_fit = None
     else:
         s21_fit = rr_s21_hanger(*s21_args)
-        figtitle += (
-            f"fr = {trace.fr:.3g} ± {trace.fr_err:.3g}\n"
-            f"Qi = {trace.Qi:.2g} ± {trace.Qi_err:.2g}\n"
-            f"Ql = {trace.Ql:.2g} ± {trace.Ql_err:.2g}\n"
-            f"|Qc| = {trace.absQc:.2g} ± {trace.absQc_err:.2g}\n"
-            f"phi = {trace.phi:.2f} ± {trace.phi_err:.2f}\n"
-        )
+        # figtitle += (
+        #    f"fr = {trace.fr:.3g} ± {trace.fr_err:.3g}\n"
+        #    f"Qi = {trace.Qi:.2g} ± {trace.Qi_err:.2g}\n"
+        #    f"Ql = {trace.Ql:.2g} ± {trace.Ql_err:.2g}\n"
+        #    f"|Qc| = {trace.absQc:.2g} ± {trace.absQc_err:.2g}\n"
+        #    f"phi = {trace.phi:.2f} ± {trace.phi_err:.2f}\n"
+        # )
 
     # extract centered phase best fit from Trace
     # rp = center - (orp - center)
@@ -84,8 +85,8 @@ def plot_hangerfit(trace: Trace, do_fit: bool = False):
     # theta = (beta + np.pi) % (2 * np.pi) - np.pi
     # cp_fit = centered_phase(trace.frequency, trace.fr, trace.Ql, theta)
 
-    fig = plt.figure(tight_layout=True, figsize=(12, 12))
-    fig.suptitle(figtitle)
+    fig = plt.figure(tight_layout=True, figsize=figsize)
+    fig.suptitle(plot_title)
     gs = GridSpec(6, 6, figure=fig)
 
     s21_ax = fig.add_subplot(gs[:3, :3])
