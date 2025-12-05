@@ -62,8 +62,8 @@ def QIntVsTemp_consistent_error_function(params, temps, freq0, power, Qc, Qint_i
     resid = []
 
     for i in range(len(temps)):
-        #res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0]) / errors[i]
-        res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0])
+        res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0]) / errors[i]
+        #res = (data[i] - QIntVsTemp_consistent([temps[i]], params, [freq0[i]], [power[i]], Qc, [Qint_init[i]])[0])
         #print(f"{res}")
         resid.append(res)
     return np.hstack(resid)
@@ -101,8 +101,8 @@ def QIntVsTemp_TLS_QP_Beta_fit_usingParams(temp, params, freq0, nbar, powerID, z
 def QIntVsTemp_TLS_QP_Beta_error_function_usingParams(params, temps, data, freq0, nbarLis, powerIDs, errors):
     resid = []
     for i in range(len(temps)):
-        #val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i], powerIDs)) / errors[i]
-        val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i], powerIDs))
+        val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i], powerIDs)) / errors[i]
+        #val = (data[i] - QIntVsTemp_TLS_QP_Beta_fit_usingParams(temps[i], params, freq0[i], nbarLis[i], powerIDs))
         resid.append(val)
     return np.hstack(resid)
 
