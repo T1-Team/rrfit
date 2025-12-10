@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "rrfit"
-version = "1.0.4"
+version = "1.1.0"
 description = ""
 authors = ["T1-Team <deleonlab@princeton.edu>"]
 readme = "README.md"
