@@ -18,6 +18,7 @@ kb = k  # Boltzmann constant [J/K]
 # TLS + QP helper functions
 # ---------------------------------------------------------------------------
 
+
 def FFS_TLS_func(tempK: np.ndarray, Q_TLS0: float, omega: float) -> np.ndarray:
     """
     TLS-induced fractional frequency shift vs temperature.
@@ -35,6 +36,7 @@ def FFS_TLS_func(tempK: np.ndarray, Q_TLS0: float, omega: float) -> np.ndarray:
     )
     return FFS_TLS
 
+
 def sigma1_func(tempK: np.ndarray, omega: float, gap: float) -> np.ndarray:
     """
     Real part of complex conductivity σ1 in the local limit, normalized so σ_n = 1.
@@ -43,8 +45,14 @@ def sigma1_func(tempK: np.ndarray, omega: float, gap: float) -> np.ndarray:
     tempK = np.where(tempK <= 0, 1e-6, tempK)
 
     xi = hbar * omega / (2 * kb * tempK)
-    sigma1 = (4 * gap / (hbar * omega)) * np.exp(-gap / (kb * tempK)) * np.sinh(xi) * kn(0, xi)
+    sigma1 = (
+        (4 * gap / (hbar * omega))
+        * np.exp(-gap / (kb * tempK))
+        * np.sinh(xi)
+        * kn(0, xi)
+    )
     return sigma1
+
 
 def sigma2_func(tempK: np.ndarray, omega: float, gap: float) -> np.ndarray:
     """
@@ -65,6 +73,7 @@ def sigma2_func(tempK: np.ndarray, omega: float, gap: float) -> np.ndarray:
 def sigma2_0K_func(omega: float, gap: float) -> float:
     """σ2 evaluated at T = 0 (normalized)."""
     return np.pi * gap / (hbar * omega)
+
 
 def FFS_QP_func(
     tempK: np.ndarray,
@@ -102,6 +111,7 @@ def FFS_QP_func(
     FFS_QP = (alpha / 2.0) * (ratio - 1.0)
 
     return FFS_QP
+
 
 # ---------------------------------------------------------------------------
 # FFS vs T model and residuals
@@ -163,6 +173,7 @@ def ffs_error_function(
 # Data collection from a Device at fixed power
 # ---------------------------------------------------------------------------
 
+
 def _collect_ffs_data_for_device(
     device: Device,
     powerContour: Optional[float] = None,
@@ -185,7 +196,9 @@ def _collect_ffs_data_for_device(
         traces.append(tr)
 
     if len(traces) < 2:
-        raise ValueError("Not enough traces to perform FFS fit (need at least 2 at this power).")
+        raise ValueError(
+            "Not enough traces to perform FFS fit (need at least 2 at this power)."
+        )
 
     traces.sort(key=lambda tr: tr.temperature)
 
@@ -219,6 +232,7 @@ def _collect_ffs_data_for_device(
 # ---------------------------------------------------------------------------
 # Single FFS vs T fit on a Device at fixed power
 # ---------------------------------------------------------------------------
+
 
 def Fit_FFSVsTemp_gammaFixed(
     device: Device,
@@ -272,7 +286,9 @@ def Fit_FFSVsTemp_gammaFixed(
 
     if makePlot:
         temp_interp = np.linspace(np.min(tempsK), np.max(tempsK), 300)
-        model_init = ffs_vs_temp_model(temp_interp, params, f0_ref, limit=limit, fitQP=fitQP)
+        model_init = ffs_vs_temp_model(
+            temp_interp, params, f0_ref, limit=limit, fitQP=fitQP
+        )
         model_fit = ffs_vs_temp_model(
             temp_interp, result.params, f0_ref, limit=limit, fitQP=fitQP
         )
@@ -319,6 +335,7 @@ def Fit_FFSVsTemp_gammaFixed(
 # ---------------------------------------------------------------------------
 # Multi-start wrapper helpers
 # ---------------------------------------------------------------------------
+
 
 def _create_default_init_params() -> Parameters:
     """Default starting values for Q_TLS0, alpha, tc."""
@@ -405,6 +422,7 @@ def createFitHistograms_FFS(
 # ---------------------------------------------------------------------------
 # Multi-start FFS vs T fitting: main public function
 # ---------------------------------------------------------------------------
+
 
 def fitIterated_FFS_gammaFixed(
     device: Device,
@@ -516,4 +534,39 @@ def fitIterated_FFS_gammaFixed(
     for name, par in params_best.items():
         print(f"  {name:8s} = {par.value:.6g}")
 
-    return initDict, finalDict, red_chi2_arr, [chi2Fig, countFig, probFig, initFig, fittedFig]
+    return (
+        initDict,
+        finalDict,
+        red_chi2_arr,
+        [chi2Fig, countFig, probFig, initFig, fittedFig],
+    )
+
+
+# ---------------------------------------------------------------------------
+# Visualize ffs vs temp plot before fitting
+# ---------------------------------------------------------------------------
+
+
+def plot_ffs_vs_temp(devices, figsize=(8, 6)):
+    """ """
+    fig, ax = plt.subplots(figsize=figsize)
+
+    for idx, device in enumerate(devices):
+        traces = [trace for trace in device.traces if not trace.is_excluded]
+        temperatures = np.array([trace.temperature for trace in traces])
+        sorted_temp_idx = np.argsort(temperatures)
+        sorted_temperatures_mK = temperatures[sorted_temp_idx] * 1e3
+        frs = np.array([trace.fr for trace in traces])[sorted_temp_idx]
+        ffrs_ppm = ((frs - frs[0]) / frs[0]) * 1e6
+
+        print(np.array2string(sorted_temperatures_mK, separator=","))
+        print(np.array2string(ffrs_ppm, separator=","))
+
+        ax.scatter(
+            sorted_temperatures_mK, ffrs_ppm, s=80, c=f"C{idx}", label=device.pitch
+        )
+
+    ax.set_xlabel("Temperature (mK)", fontsize=20)
+    ax.set_ylabel(r"$\delta f/f$ (ppm)", fontsize=20)
+    ax.tick_params(axis="both", which="major", labelsize=20, width=2)
+    ax.legend()
