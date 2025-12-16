@@ -3,119 +3,78 @@
 import random
 from typing import Dict, Tuple, Optional
 
+import corner
+import emcee
 import numpy as np
 import matplotlib.pyplot as plt
 
-from lmfit import Parameters, minimize
+from lmfit import Parameters, minimize, fit_report
 from scipy.constants import k, hbar
-from scipy.special import digamma, kn, iv
+from scipy.special import digamma, kn, iv, k0, i0
 
 from rrfit.dataio import Device
 
-kb = k  # Boltzmann constant [J/K]
-
-# ---------------------------------------------------------------------------
-# TLS + QP helper functions
-# ---------------------------------------------------------------------------
+kb = k  # Boltzmann constant
 
 
-def FFS_TLS_func(tempK: np.ndarray, Q_TLS0: float, omega: float) -> np.ndarray:
-    """
-    TLS-induced fractional frequency shift vs temperature.
+def FFS_TLS_func(temp, Q_TLS0, omega):
+    """ """
+    if Q_TLS0 == 0.0:
+        return 0.0
 
-    Based on the standard digamma-log expression (cf. Gao thesis).
-    Returns Δf/f0 (dimensionless).
-    """
-    tempK = np.asarray(tempK, dtype=float)
-    # Avoid division by zero at T=0
-    tempK = np.where(tempK <= 0, 1e-6, tempK)
+    prefactor = 1 / (Q_TLS0 * np.pi)
+    xi = (hbar * omega) / (2 * np.pi * kb * temp)
+    digamma_arg = 0.5 + 1j * xi
 
-    arg = 0.5 - hbar * omega / (2j * np.pi * kb * tempK)
-    FFS_TLS = (1.0 / (Q_TLS0 * np.pi)) * (
-        np.real(digamma(arg)) - np.log(hbar * omega / (2 * np.pi * kb * tempK))
-    )
-    return FFS_TLS
+    return prefactor * np.real(digamma(digamma_arg) - np.log(xi))
 
+def sigma_1_fn(temp, omega, gap):
+    """ """
+    if temp is None:
+        return 0
 
-def sigma1_func(tempK: np.ndarray, omega: float, gap: float) -> np.ndarray:
-    """
-    Real part of complex conductivity σ1 in the local limit, normalized so σ_n = 1.
-    """
-    tempK = np.asarray(tempK, dtype=float)
-    tempK = np.where(tempK <= 0, 1e-6, tempK)
+    xi = (hbar * omega) / (2 * kb * temp)
+    prefactor = (4 * gap) / (hbar * omega)
 
-    xi = hbar * omega / (2 * kb * tempK)
-    sigma1 = (
-        (4 * gap / (hbar * omega))
-        * np.exp(-gap / (kb * tempK))
-        * np.sinh(xi)
-        * kn(0, xi)
-    )
-    return sigma1
+    return prefactor * np.exp(-gap / (kb * temp)) * np.sinh(xi) * k0(xi)
 
 
-def sigma2_func(tempK: np.ndarray, omega: float, gap: float) -> np.ndarray:
-    """
-    Imaginary part of complex conductivity σ2 in the local limit, normalized so σ_n = 1.
-    """
-    tempK = np.asarray(tempK, dtype=float)
-    tempK = np.where(tempK <= 0, 1e-6, tempK)
+def sigma_2_fn(temp, omega, gap):
+    """ """
+    if temp is None:
+        return (np.pi * gap) / (hbar * omega)
 
-    xi = hbar * omega / (2 * kb * tempK)
-    sigma2 = (np.pi * gap / (hbar * omega)) * (
-        1
-        - np.sqrt(2 * np.pi * kb * tempK / gap) * np.exp(-gap / (kb * tempK))
-        - 2 * np.exp(-gap / (kb * tempK)) * np.exp(-xi) * iv(0, xi)
-    )
-    return sigma2
+    xi = (hbar * omega) / (2 * kb * temp)
+    prefactor = (np.pi * gap) / (hbar * omega)
+    sqrt_term = np.sqrt((2 * np.pi * kb * temp) / gap)
+    exp_term = np.exp(-gap / (kb * temp))
 
+    term_1 = sqrt_term * exp_term
+    term_2 = 2 * exp_term * np.exp(-xi) * i0(xi)
 
-def sigma2_0K_func(omega: float, gap: float) -> float:
-    """σ2 evaluated at T = 0 (normalized)."""
-    return np.pi * gap / (hbar * omega)
+    return prefactor * (1 - term_1 - term_2)
 
 
-def FFS_QP_func(
-    tempK: np.ndarray,
-    omega: float,
-    gap: float,
-    alpha: float,
-    Tc: float,
-    gamma: float,
-) -> np.ndarray:
-    """
-    Quasiparticle-induced fractional frequency shift vs temperature.
+def FFS_QP_func(temp, omega, gap, alpha, gamma):
+    """ """
 
-    Simpler, Gao-style model:
-        Δf/f0(T) = (α/2) * (σ2(T)/σ2(0) - 1)
+    sigma_1_T = sigma_1_fn(temp, omega, gap)
+    sigma_2_T = sigma_2_fn(temp, omega, gap)
 
-    where σ2 is the imaginary part of the complex conductivity in the
-    local limit (Mattis–Bardeen approximation).
+    sigma_1_0K = sigma_1_fn(None, omega, gap)
+    sigma_2_0K = sigma_2_fn(None, omega, gap)
 
-    This is monotonic in the low-T regime (T << Tc) and avoids the
-    high-temperature "resurgence" seen with more complicated gamma
-    formulas. The argument `gamma` is kept for API compatibility but
-    is not used here.
-    """
-    tempK = np.asarray(tempK, dtype=float)
-    tempK = np.where(tempK <= 0, 1e-6, tempK)
+    phi_T = np.arctan(sigma_2_T / sigma_1_T)
+    sin_ratio = np.sin(gamma * phi_T) / np.sin(gamma * np.pi / 2)
 
-    # Imaginary conductivity at T and at 0 K
-    sigma2 = sigma2_func(tempK, omega, gap)
-    sigma2_0 = sigma2_0K_func(omega, gap)
+    sigma_norm_T = np.sqrt(sigma_1_T**2 + sigma_2_T**2)
+    sigma_norm_0K = np.sqrt(sigma_1_0K**2 + sigma_2_0K**2)
+    sigma_norm_ratio = (sigma_norm_T / sigma_norm_0K) ** gamma
 
-    # Normalized ratio (1 at T=0, decreasing with T)
-    ratio = sigma2 / sigma2_0
+    prefactor = alpha / 2
 
-    # Gao-style QP frequency shift
-    FFS_QP = (alpha / 2.0) * (ratio - 1.0)
+    return prefactor * (1 - sin_ratio * sigma_norm_ratio)
 
-    return FFS_QP
-
-
-# ---------------------------------------------------------------------------
-# FFS vs T model and residuals
-# ---------------------------------------------------------------------------
 
 GAMMA_DICT = {
     "thickFilmLocal": -0.5,
@@ -124,160 +83,91 @@ GAMMA_DICT = {
 }
 
 
-def ffs_vs_temp_model(
-    tempK: np.ndarray,
-    params: Parameters,
-    freq0: float,
-    limit: str = "thinFilmLocal",
-    fitQP: bool = True,
-) -> np.ndarray:
-    """
-    Model:
+def ffs_vs_temp_model(temp, params, limit="thinFilmLocal"):
+    """ """
 
-        Δf/f0(T) = FFS_TLS(T; Q_TLS0) + FFS_QP(T; alpha, Tc, gamma(limit)).
-    """
     Q_TLS0 = params["Q_TLS0"].value
     Tc = params["tc"].value
-    alpha = params["alpha"].value if fitQP else 0.0
+    alpha = params["alpha"].value
+    f0 = params["f0"].value
 
-    gamma = GAMMA_DICT.get(limit, GAMMA_DICT["thinFilmLocal"])
-
-    tempK = np.asarray(tempK, dtype=float)
-    omega = 2.0 * np.pi * freq0
+    gamma = GAMMA_DICT[limit]
+    omega = 2 * np.pi * f0
     gap = 1.764 * kb * Tc
 
-    FFS_TLS = FFS_TLS_func(tempK, Q_TLS0, omega)
-    if fitQP:
-        FFS_QP = FFS_QP_func(tempK, omega, gap, alpha, Tc, gamma)
-    else:
-        FFS_QP = 0.0
+    FFS_TLS = FFS_TLS_func(temp, Q_TLS0, omega)
+    FFS_QP = FFS_QP_func(temp, omega, gap, alpha, gamma)
+    FFS = FFS_TLS + FFS_QP
 
-    return FFS_TLS + FFS_QP
+    return (f0 * FFS) + f0
 
 
-def ffs_error_function(
-    params: Parameters,
-    tempsK: np.ndarray,
-    data: np.ndarray,
-    dataErr: np.ndarray,
-    freq0: float,
-    limit: str,
-    fitQP: bool,
-) -> np.ndarray:
-    """Residuals for lmfit.minimize."""
-    model = ffs_vs_temp_model(tempsK, params, freq0, limit=limit, fitQP=fitQP)
-    return (data - model) / dataErr
+def ffs_error_function(params, temp, data, data_err, limit):
+    """ """
+    model = ffs_vs_temp_model(temp, params, limit=limit)
+    return (data - model) #/ data_err
+
+def get_ffs_err(fr0, fr0_err, fr, fr_err):
+    f0, fT, df0, dfT = fr0, fr, fr0_err, fr_err
+    partial_f0 = 1 / f0
+    partial_fT = -fT / (f0**2)
+    return np.sqrt((partial_f0 * df0) ** 2.0 + (partial_fT * dfT) ** 2)
 
 
-# ---------------------------------------------------------------------------
-# Data collection from a Device at fixed power
-# ---------------------------------------------------------------------------
-
-
-def _collect_ffs_data_for_device(
-    device: Device,
-    powerContour: Optional[float] = None,
-):
-    """
-    Collect (tempsK, Δf/f0, Δf/f0_err, f0_ref) for a Device at one power.
-
-    - Uses only traces with trace.is_excluded != True.
-    - If powerContour is not None, only traces with that power are used.
-    - Uses lowest-temperature trace as reference frequency f0_ref.
-    """
-    traces = []
-    for tr in device.traces:
-        if getattr(tr, "is_excluded", False):
-            continue
-        if powerContour is not None and tr.power != powerContour:
-            continue
-        if tr.fr is None:
-            continue
-        traces.append(tr)
-
-    if len(traces) < 2:
-        raise ValueError(
-            "Not enough traces to perform FFS fit (need at least 2 at this power)."
-        )
-
-    traces.sort(key=lambda tr: tr.temperature)
-
-    tr0 = traces[0]
-    f0_ref = tr0.fr
-    f0_ref_err = tr0.fr_err if tr0.fr_err is not None else 0.0
-
-    tempsK = np.array([tr.temperature for tr in traces], dtype=float)
-    freqs = np.array([tr.fr for tr in traces], dtype=float)
-    freq_errs = np.array(
-        [tr.fr_err if tr.fr_err is not None else 0.0 for tr in traces],
-        dtype=float,
-    )
-
-    frac_shift = (freqs - f0_ref) / f0_ref
-    frac_shift_err = np.sqrt(freq_errs**2 + f0_ref_err**2) / max(f0_ref, 1.0)
-
-    # Avoid zero uncertainties
-    if np.any(frac_shift_err <= 0):
-        positive = frac_shift_err[frac_shift_err > 0]
-        if positive.size == 0:
-            frac_shift_err[:] = 1e-8
-        else:
-            frac_shift_err = np.where(
-                frac_shift_err <= 0, 0.5 * np.min(positive), frac_shift_err
-            )
-
-    return tempsK, frac_shift, frac_shift_err, f0_ref
-
-
-# ---------------------------------------------------------------------------
-# Single FFS vs T fit on a Device at fixed power
-# ---------------------------------------------------------------------------
-
-
-def Fit_FFSVsTemp_gammaFixed(
-    device: Device,
+def fit_FFS_vs_temp(
+    device: Device, 
     init_params: Parameters,
     limit: str = "thinFilmLocal",
     makePlot: bool = True,
-    powerContour: Optional[float] = None,
-    fitQP: bool = True,
-    fixTc: Optional[float] = None,
-    fixalpha: Optional[float] = None,
+    powers=None,
+    verbose=False,
+    fit_QTLS0=True,
+    fit_QP=True,
+    fit_f0=True,
+    method="least_squares",
 ):
-    """
-    Perform a single FFS vs T fit for a given Device at a fixed power.
+    """ """
 
-    Returns
-    -------
-    params_fit : lmfit.Parameters
-    initFig : matplotlib Figure or None
-    fittedFig : matplotlib Figure or None
-    red_chi2 : float
-    """
-    tempsK, frac_shift, frac_shift_err, f0_ref = _collect_ffs_data_for_device(
-        device, powerContour=powerContour
-    )
+    traces = []
+    for trace in device.traces:
+        if trace.is_excluded:
+            continue
+        if powers is not None and trace.power not in powers:
+            continue
+        traces.append(trace)
+
+    traces.sort(key=lambda tr: tr.temperature)
+    temp = np.array([tr.temperature for tr in traces])
+    fr = np.array([tr.fr for tr in traces])
+    fr_err = np.array([tr.fr_err for tr in traces])
+    fr_ref = traces[0].fr
+    fr_ref_err = traces[0].fr_err
 
     params = init_params.copy()
 
-    if fixTc is not None:
-        params["tc"].value = fixTc
-        params["tc"].vary = False
+    if not fit_QTLS0:
+        params["Q_TLS0"].value = 0.0
+        params["Q_TLS0"].vary = False
 
-    if fixalpha is not None:
-        params["alpha"].value = fixalpha
-        params["alpha"].vary = False
-
-    if not fitQP:
+    if not fit_QP:
         params["alpha"].value = 0.0
         params["alpha"].vary = False
+        params["tc"].vary = False
+
+    params["f0"].value = fr_ref
+    if not fit_f0:
+        params["f0"].stderr = fr_ref_err
+        params["f0"].vary = False
 
     result = minimize(
         ffs_error_function,
         params=params,
-        args=(tempsK, frac_shift, frac_shift_err, f0_ref, limit, fitQP),
-        method="least_squares",
+        args=(temp, fr, fr_err, limit),
+        method=method,
     )
+
+    if verbose:
+        print(fit_report(result))
 
     red_chi2 = result.redchi
 
@@ -285,90 +175,68 @@ def Fit_FFSVsTemp_gammaFixed(
     fittedFig = None
 
     if makePlot:
-        temp_interp = np.linspace(np.min(tempsK), np.max(tempsK), 300)
-        model_init = ffs_vs_temp_model(
-            temp_interp, params, f0_ref, limit=limit, fitQP=fitQP
-        )
-        model_fit = ffs_vs_temp_model(
-            temp_interp, result.params, f0_ref, limit=limit, fitQP=fitQP
-        )
+        temp_interp = np.linspace(np.min(temp), np.max(temp), 251)
+        model_init_fr = ffs_vs_temp_model(temp_interp, params, limit=limit)
+        model_fit_fr = ffs_vs_temp_model(temp_interp, result.params, limit=limit)
 
+        ffs_initial = np.array([(tr.fr - fr_ref) / fr_ref for tr in traces])
+        ffs_initial_err = get_ffs_err(fr_ref, fr_ref_err, fr, fr_err)
+
+        f0_final = result.params["f0"].value
+        f0_final_err = result.params["f0"].stderr
+        f0_final_err = 0 if f0_final_err is None else f0_final_err
+        ffs_final = np.array([(tr.fr - f0_final) / f0_final for tr in traces])
+        ffs_final_err = get_ffs_err(f0_final, f0_final_err, fr, fr_err)
+    
+        model_init_ffs = (model_init_fr - fr_ref) / fr_ref
+        model_fit_ffs = (model_fit_fr - f0_final) / f0_final
+    
         # Initial guess plot (white background)
-        initFig, ax = plt.subplots(figsize=(5, 3), dpi=150, facecolor="white")
+        initFig, ax = plt.subplots(figsize=(8, 6), dpi=150, facecolor="white")
         ax.set_facecolor("white")
         ax.errorbar(
-            tempsK * 1e3,
-            frac_shift,
-            yerr=frac_shift_err,
+            temp * 1e3, # mK
+            ffs_initial * 1e6, # ppm
+            yerr=ffs_initial_err * 1e6, # ppm
             fmt="o",
-            capsize=2,
-            markersize=3,
             label="data",
         )
-        ax.plot(temp_interp * 1e3, model_init, "r", label="initial guess")
+        ax.plot(temp_interp * 1e3, model_init_ffs * 1e6, "r", label="initial guess")
         ax.set_xlabel("Temperature (mK)")
-        ax.set_ylabel("Fractional frequency shift Δf/f0")
+        ax.set_ylabel(r"$\delta f/f$ (ppm)")
         ax.set_title(f"FFS init params, {device.name}")
         ax.legend()
 
         # Final fit plot (white background)
-        fittedFig, ax2 = plt.subplots(figsize=(5, 3), dpi=150, facecolor="white")
+        fittedFig, ax2 = plt.subplots(figsize=(8, 6), dpi=150, facecolor="white")
         ax2.set_facecolor("white")
         ax2.errorbar(
-            tempsK * 1e3,
-            frac_shift,
-            yerr=frac_shift_err,
+            temp * 1e3, # mK
+            ffs_final * 1e6, # ppm
+            yerr=ffs_final_err * 1e6, # ppm
             fmt="o",
-            capsize=2,
-            markersize=3,
             label="data",
         )
-        ax2.plot(temp_interp * 1e3, model_fit, "g", label="fit")
+        ax2.plot(temp_interp * 1e3, model_fit_ffs * 1e6, "g", label="fit")
         ax2.set_xlabel("Temperature (mK)")
-        ax2.set_ylabel("Fractional frequency shift Δf/f0")
+        ax2.set_ylabel(r"$\delta f/f$ (ppm)")
         ax2.set_title(f"FFS fit, {device.name}")
         ax2.legend()
 
+        initFig.tight_layout()
+        fittedFig.tight_layout()
+    
     return result.params, initFig, fittedFig, red_chi2
 
 
-# ---------------------------------------------------------------------------
-# Multi-start wrapper helpers
-# ---------------------------------------------------------------------------
-
-
 def _create_default_init_params() -> Parameters:
-    """Default starting values for Q_TLS0, alpha, tc."""
-    p = Parameters()
-    p.add("Q_TLS0", value=1e6, min=0.0)
-    p.add("alpha", value=0.1, min=0.0)
-    p.add("tc", value=4.4, min=0.0, max=10.0)  # overwritten by boundsDict
-    return p
-
-
-def _apply_bounds_to_params(
-    init_params: Parameters,
-    boundsDict: Dict[str, Tuple[float, float]],
-) -> Parameters:
-    """
-    Copy bounds from boundsDict onto the lmfit Parameters object.
-
-    - For each pname in boundsDict:
-        * set .min and .max
-        * if low == high: fix the parameter (vary = False, value = low)
-    """
-    for pname, (low, high) in boundsDict.items():
-        if pname not in init_params:
-            init_params.add(pname, value=0.5 * (low + high), min=low, max=high)
-        else:
-            init_params[pname].min = low
-            init_params[pname].max = high
-
-        if np.isclose(low, high):
-            init_params[pname].value = low
-            init_params[pname].vary = False
-
-    return init_params
+    """ """
+    params = Parameters()
+    params.add("Q_TLS0", value=1e6, min=0.0)
+    params.add("alpha", value=0.5, min=0.0)
+    params.add("tc", value=0.7, min=0.0, max=2.0)
+    params.add("f0", value=5e9, min=1e9, max=9e9)
+    return params
 
 
 def createFitHistograms_FFS(
@@ -377,13 +245,10 @@ def createFitHistograms_FFS(
     boundsDict: Dict[str, Tuple[float, float]],
     red_chi2: np.ndarray,
 ):
-    """
-    Lightweight visualization of the multi-start results:
-    - χ² histogram
-    - init vs final scatter per parameter
-    """
+    """ """
+
     # χ² histogram (white background)
-    chi2Fig, chi_ax = plt.subplots(1, 1, figsize=(4.0, 3.0), dpi=150, facecolor="white")
+    chi2Fig, chi_ax = plt.subplots(1, 1, figsize=(8.0, 6.0), dpi=150, facecolor="white")
     chi_ax.set_facecolor("white")
     chi_ax.hist(red_chi2, bins=30, alpha=0.7)
     chi_ax.set_xlabel(r"$\chi^2_\nu$")
@@ -394,7 +259,7 @@ def createFitHistograms_FFS(
     countFig, axs = plt.subplots(
         len(boundsDict),
         1,
-        figsize=(4.0, 3.0 * len(boundsDict)),
+        figsize=(8.0, 6.0 * len(boundsDict)),
         dpi=150,
         sharex=False,
         facecolor="white",
@@ -408,55 +273,34 @@ def createFitHistograms_FFS(
             initDict[pname],
             finalDict[pname],
             c=red_chi2,
-            cmap="viridis",
-            s=15,
+            cmap="plasma",
         )
         ax.set_xlabel(f"{pname} init")
         ax.set_ylabel(f"{pname} final")
         ax.set_title(pname)
 
     probFig = None  # placeholder for compatibility with older API
+    chi2Fig.tight_layout()
+    countFig.tight_layout()
     return chi2Fig, countFig, probFig
-
-
-# ---------------------------------------------------------------------------
-# Multi-start FFS vs T fitting: main public function
-# ---------------------------------------------------------------------------
-
 
 def fitIterated_FFS_gammaFixed(
     device: Device,
     boundsDict: Dict[str, Tuple[float, float]],
     numIter: int,
+    retries: int = 25,
+    init_params: Optional[Parameters] = None,
     limit: str = "thinFilmLocal",
     makePlot: bool = True,
-    powerContour: Optional[float] = None,
-    fitQP: bool = True,
-    retries: int = 10,
-    init_params: Optional[Parameters] = None,
-    fixTc: Optional[float] = None,
-    fixalpha: Optional[float] = None,
+    powers=None,
+    fit_QTLS0=True,
+    fit_QP=True,
+    fit_f0=True,
+    method="least_squares",
 ):
-    """
-    Multi-start FFS vs T fit, analogous to waterfall.fitIterated and the old
-    hangerDevice.fitIterated_FFS_gammaFixed.
-
-    Returns
-    -------
-    initDict : dict
-        Random initial values used in each iteration, per parameter.
-    finalDict : dict
-        Fitted parameter values for each iteration.
-    red_chi2_arr : np.ndarray
-        Reduced chi^2 for each iteration.
-    figList : list
-        [chi2Fig, countFig, probFig, initFig, fittedFig]
-    """
+    """ """
     if init_params is None:
         init_params = _create_default_init_params()
-
-    # Enforce bounds in the lmfit Parameters
-    init_params = _apply_bounds_to_params(init_params, boundsDict)
 
     initDict: Dict[str, np.ndarray] = {}
     finalDict: Dict[str, np.ndarray] = {}
@@ -479,15 +323,16 @@ def fitIterated_FFS_gammaFixed(
                     initDict[pname][i] = val
                     init_params[pname].value = val
 
-                params_fit, _, _, red_chi2 = Fit_FFSVsTemp_gammaFixed(
+                params_fit, _, _, red_chi2 = fit_FFS_vs_temp(
                     device,
                     init_params,
                     limit=limit,
                     makePlot=False,
-                    powerContour=powerContour,
-                    fitQP=fitQP,
-                    fixTc=fixTc,
-                    fixalpha=fixalpha,
+                    powers=powers,
+                    fit_QTLS0=fit_QTLS0,
+                    fit_QP=fit_QP,
+                    fit_f0=fit_f0,
+                    method=method,
                 )
 
                 for pname in boundsDict.keys():
@@ -516,21 +361,23 @@ def fitIterated_FFS_gammaFixed(
     for pname in boundsDict.keys():
         init_params[pname].value = initDict[pname][bestInd]
 
-    params_best, initFig, fittedFig, _ = Fit_FFSVsTemp_gammaFixed(
+    params_best, initFig, fittedFig, _ = fit_FFS_vs_temp(
         device,
         init_params,
         limit=limit,
-        makePlot=makePlot,
-        powerContour=powerContour,
-        fitQP=fitQP,
-        fixTc=fixTc,
-        fixalpha=fixalpha,
+        makePlot=True,
+        powers=powers,
+        verbose=True,
+        fit_QTLS0=fit_QTLS0,
+        fit_QP=fit_QP,
+        fit_f0=fit_f0,
+        method=method,
     )
 
     # stash best params on the device for convenience
     setattr(device, "ffs_best_params", params_best)
 
-    print("\n[FFS] Best-fit parameters at powerContour =", powerContour)
+    print(f"\n[FFS] Best-fit parameters at {powers = }")
     for name, par in params_best.items():
         print(f"  {name:8s} = {par.value:.6g}")
 
@@ -540,11 +387,6 @@ def fitIterated_FFS_gammaFixed(
         red_chi2_arr,
         [chi2Fig, countFig, probFig, initFig, fittedFig],
     )
-
-
-# ---------------------------------------------------------------------------
-# Visualize ffs vs temp plot before fitting
-# ---------------------------------------------------------------------------
 
 
 def plot_ffs_vs_temp(devices, figsize=(8, 6)):
@@ -559,14 +401,48 @@ def plot_ffs_vs_temp(devices, figsize=(8, 6)):
         frs = np.array([trace.fr for trace in traces])[sorted_temp_idx]
         ffrs_ppm = ((frs - frs[0]) / frs[0]) * 1e6
 
-        print(np.array2string(sorted_temperatures_mK, separator=","))
-        print(np.array2string(ffrs_ppm, separator=","))
-
         ax.scatter(
-            sorted_temperatures_mK, ffrs_ppm, s=80, c=f"C{idx}", label=device.pitch
+            sorted_temperatures_mK, ffrs_ppm, c=f"C{idx}", label=device.pitch
         )
 
     ax.set_xlabel("Temperature (mK)", fontsize=20)
     ax.set_ylabel(r"$\delta f/f$ (ppm)", fontsize=20)
     ax.tick_params(axis="both", which="major", labelsize=20, width=2)
     ax.legend()
+
+def emcee_ffs(device, nsamples=1000, nburn=200, nwalkers=20,plot=True):
+    """ """
+    trs=[]
+
+    for tr in self.getAllGoodTraces():
+        trs.append(tr)
+
+    freqArray=np.asarray([tr.getFreq0() for tr in trs])
+    freqErrArray=np.asarray([tr.getFreq0Err() for tr in trs])
+    tempArray = np.asarray([tr.getTemp() for tr in trs])
+    popt=self.fitParams_FFSVsTemp_gammaFixed['thinFilmLocal']
+
+    def log_chi2_dist(params):
+        chi2_norm = np.sum(np.power(FVsTempGammaFixedFitF0_error_function(popt,tempArray,freqArray,freqErrArray,limit='thinFilmLocal',fitQP=True),2))
+        df=len(trs)-len(params)
+        params_temp = Parameters()
+        params_temp.add('Q_TLS0', value=params[0])
+        params_temp.add('alpha', value=params[1])
+        params_temp.add('tc', value=params[2])
+        params_temp.add('f0', value=params[3])
+        chi2 = np.sum(np.power(FVsTempGammaFixedFitF0_error_function(params_temp,tempArray,freqArray,freqErrArray,limit='thinFilmLocal',fitQP=True),2))
+        if np.isnan(stats.chi2.logpdf(chi2/chi2_norm*df,df)):
+            # print(chi2)
+            return -np.inf
+        return stats.chi2.logpdf(chi2/chi2_norm*df,df)
+    
+    sampler = emcee.EnsembleSampler(nwalkers=nwalkers, ndim=len(popt), log_prob_fn=log_chi2_dist)
+
+    pos = [popt[param].value for param in popt] + 5e-2*np.random.randn(nwalkers, len(popt))
+    state=sampler.run_mcmc(pos, nsamples, progress=True)
+    flat_samples = sampler.get_chain(discard=nburn,flat=True)
+    if plot:
+        fig = corner.corner(
+        flat_samples, labels=["Q_TLS0","alpha","tc",'f0'], truths=[popt[param].value for param in popt]
+    )
+    return flat_samples
