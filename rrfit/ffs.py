@@ -28,6 +28,7 @@ def FFS_TLS_func(temp, Q_TLS0, omega):
 
     return prefactor * np.real(digamma(digamma_arg) - np.log(xi))
 
+
 def sigma_1_fn(temp, omega, gap):
     """ """
     if temp is None:
@@ -105,7 +106,8 @@ def ffs_vs_temp_model(temp, params, limit="thinFilmLocal"):
 def ffs_error_function(params, temp, data, data_err, limit):
     """ """
     model = ffs_vs_temp_model(temp, params, limit=limit)
-    return (data - model) #/ data_err
+    return (data - model) / data_err
+
 
 def get_ffs_err(fr0, fr0_err, fr, fr_err):
     f0, fT, df0, dfT = fr0, fr, fr0_err, fr_err
@@ -115,7 +117,7 @@ def get_ffs_err(fr0, fr0_err, fr, fr_err):
 
 
 def fit_FFS_vs_temp(
-    device: Device, 
+    device: Device,
     init_params: Parameters,
     limit: str = "thinFilmLocal",
     makePlot: bool = True,
@@ -187,17 +189,17 @@ def fit_FFS_vs_temp(
         f0_final_err = 0 if f0_final_err is None else f0_final_err
         ffs_final = np.array([(tr.fr - f0_final) / f0_final for tr in traces])
         ffs_final_err = get_ffs_err(f0_final, f0_final_err, fr, fr_err)
-    
+
         model_init_ffs = (model_init_fr - fr_ref) / fr_ref
         model_fit_ffs = (model_fit_fr - f0_final) / f0_final
-    
+
         # Initial guess plot (white background)
         initFig, ax = plt.subplots(figsize=(8, 6), dpi=150, facecolor="white")
         ax.set_facecolor("white")
         ax.errorbar(
-            temp * 1e3, # mK
-            ffs_initial * 1e6, # ppm
-            yerr=ffs_initial_err * 1e6, # ppm
+            temp * 1e3,  # mK
+            ffs_initial * 1e6,  # ppm
+            yerr=ffs_initial_err * 1e6,  # ppm
             fmt="o",
             label="data",
         )
@@ -211,9 +213,9 @@ def fit_FFS_vs_temp(
         fittedFig, ax2 = plt.subplots(figsize=(8, 6), dpi=150, facecolor="white")
         ax2.set_facecolor("white")
         ax2.errorbar(
-            temp * 1e3, # mK
-            ffs_final * 1e6, # ppm
-            yerr=ffs_final_err * 1e6, # ppm
+            temp * 1e3,  # mK
+            ffs_final * 1e6,  # ppm
+            yerr=ffs_final_err * 1e6,  # ppm
             fmt="o",
             label="data",
         )
@@ -225,7 +227,7 @@ def fit_FFS_vs_temp(
 
         initFig.tight_layout()
         fittedFig.tight_layout()
-    
+
     return result.params, initFig, fittedFig, red_chi2
 
 
@@ -283,6 +285,7 @@ def createFitHistograms_FFS(
     chi2Fig.tight_layout()
     countFig.tight_layout()
     return chi2Fig, countFig, probFig
+
 
 def fitIterated_FFS_gammaFixed(
     device: Device,
@@ -375,7 +378,7 @@ def fitIterated_FFS_gammaFixed(
     )
 
     # stash best params on the device for convenience
-    setattr(device, "ffs_best_params", params_best)
+    setattr(device, "ffs_fit_params", params_best)
 
     print(f"\n[FFS] Best-fit parameters at {powers = }")
     for name, par in params_best.items():
@@ -401,48 +404,89 @@ def plot_ffs_vs_temp(devices, figsize=(8, 6)):
         frs = np.array([trace.fr for trace in traces])[sorted_temp_idx]
         ffrs_ppm = ((frs - frs[0]) / frs[0]) * 1e6
 
-        ax.scatter(
-            sorted_temperatures_mK, ffrs_ppm, c=f"C{idx}", label=device.pitch
-        )
+        ax.scatter(sorted_temperatures_mK, ffrs_ppm, c=f"C{idx}", label=device.pitch)
 
     ax.set_xlabel("Temperature (mK)", fontsize=20)
     ax.set_ylabel(r"$\delta f/f$ (ppm)", fontsize=20)
     ax.tick_params(axis="both", which="major", labelsize=20, width=2)
     ax.legend()
 
-def emcee_ffs(device, nsamples=1000, nburn=200, nwalkers=20,plot=True):
-    """ """
-    trs=[]
 
-    for tr in self.getAllGoodTraces():
-        trs.append(tr)
+def emcee_ffs(
+    device,
+    limit="thinFilmLocal",
+    **emcee_kws,
+):
+    """Device must have an attribute 'ffs_fit_params' from a previous fit"""
 
-    freqArray=np.asarray([tr.getFreq0() for tr in trs])
-    freqErrArray=np.asarray([tr.getFreq0Err() for tr in trs])
-    tempArray = np.asarray([tr.getTemp() for tr in trs])
-    popt=self.fitParams_FFSVsTemp_gammaFixed['thinFilmLocal']
+    traces = [tr for tr in device.traces if not tr.is_excluded]
+    traces.sort(key=lambda tr: tr.temperature)
+    temp = np.array([tr.temperature for tr in traces])
+    fr = np.array([tr.fr for tr in traces])
+    fr_err = np.array([tr.fr_err for tr in traces])
+    params = device.ffs_fit_params
 
-    def log_chi2_dist(params):
-        chi2_norm = np.sum(np.power(FVsTempGammaFixedFitF0_error_function(popt,tempArray,freqArray,freqErrArray,limit='thinFilmLocal',fitQP=True),2))
-        df=len(trs)-len(params)
-        params_temp = Parameters()
-        params_temp.add('Q_TLS0', value=params[0])
-        params_temp.add('alpha', value=params[1])
-        params_temp.add('tc', value=params[2])
-        params_temp.add('f0', value=params[3])
-        chi2 = np.sum(np.power(FVsTempGammaFixedFitF0_error_function(params_temp,tempArray,freqArray,freqErrArray,limit='thinFilmLocal',fitQP=True),2))
-        if np.isnan(stats.chi2.logpdf(chi2/chi2_norm*df,df)):
-            # print(chi2)
-            return -np.inf
-        return stats.chi2.logpdf(chi2/chi2_norm*df,df)
-    
-    sampler = emcee.EnsembleSampler(nwalkers=nwalkers, ndim=len(popt), log_prob_fn=log_chi2_dist)
+    if not emcee_kws:
+        emcee_kws = dict(
+            steps=5000,
+            burn=500,
+            thin=20,
+            is_weighted=True,
+            progress=True,
+        )
 
-    pos = [popt[param].value for param in popt] + 5e-2*np.random.randn(nwalkers, len(popt))
-    state=sampler.run_mcmc(pos, nsamples, progress=True)
-    flat_samples = sampler.get_chain(discard=nburn,flat=True)
-    if plot:
-        fig = corner.corner(
-        flat_samples, labels=["Q_TLS0","alpha","tc",'f0'], truths=[popt[param].value for param in popt]
+    emcee_result = minimize(
+        ffs_error_function,
+        params=params,
+        args=(temp, fr, fr_err, limit),
+        method="emcee",
+        nan_policy="omit",
+        **emcee_kws,
     )
-    return flat_samples
+
+    emcee_plot = corner.corner(
+        emcee_result.flatchain,
+        labels=emcee_result.var_names,
+        truths=list(emcee_result.params.valuesdict().values()),
+    )
+    emcee_plot.tight_layout()
+
+    print("Median of posterior probability distribution")
+    print("--------------------------------------------")
+    print(fit_report(emcee_result.params))
+
+    highest_prob = np.argmax(emcee_result.lnprob)
+    hp_loc = np.unravel_index(highest_prob, emcee_result.lnprob.shape)
+    mle_soln = emcee_result.chain[hp_loc]
+    for i, par in enumerate(params):
+        params[par].value = mle_soln[i]
+
+    print("\nMaximum Likelihood Estimation from emcee       ")
+    print("-------------------------------------------------")
+    print("Parameter  MLE Value   Median Value   Uncertainty")
+    fmt = "  {:5s}  {:11.5f} {:11.5f}   {:11.5f}".format
+    for name, param in params.items():
+        print(
+            fmt(
+                name,
+                param.value,
+                emcee_result.params[name].value,
+                emcee_result.params[name].stderr,
+            )
+        )
+
+    print("\nError estimates from emcee:")
+    print("------------------------------------------------------")
+    print("Parameter  -2sigma  -1sigma   median  +1sigma  +2sigma")
+
+    for name in params.keys():
+        quantiles = np.percentile(
+            emcee_result.flatchain[name], [2.275, 15.865, 50, 84.135, 97.275]
+        )
+        median = quantiles[2]
+        err_m2 = quantiles[0] - median
+        err_m1 = quantiles[1] - median
+        err_p1 = quantiles[3] - median
+        err_p2 = quantiles[4] - median
+        fmt = "  {:5s}   {:8.4f} {:8.4f} {:8.4f} {:8.4f} {:8.4f}".format
+        print(fmt(name, err_m2, err_m1, median, err_p1, err_p2))
